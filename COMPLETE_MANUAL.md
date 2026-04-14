@@ -211,149 +211,133 @@ python verify_system.py
 
 ## 5. Running End-to-End
 
-### Start Services (REQUIRED - Start Both First!)
+### ⚠️ CRITICAL: Restart Servers After Code Changes
 
-**IMPORTANT: You must start both servers BEFORE making any API calls. Use separate terminal windows and keep them running.**
+After pulling or updating code, you **MUST restart both servers** to load the latest changes:
 
-**Terminal 1 - Grid Authority (Port 5000)**:
 ```bash
+# Kill any existing server processes (Ctrl+C in terminals)
+
+# Terminal 1: Grid Authority (Port 5000)
 python -m grid.server
-# Output: Running on http://127.0.0.1:5000
-# Keep this terminal open
-```
 
-**Terminal 2 - Kiosk Server (Port 5001)**:
-```bash
+# Terminal 2: Kiosk Server (Port 5001)
 python -m kiosk.server
-# Output: Running on http://127.0.0.1:5001
-# Keep this terminal open
 ```
 
-**Important**: Both servers must be running and show their respective startup messages before proceeding to the next steps.
+Wait for both to show startup messages before proceeding.
 
-### Execute Complete Flow
+---
 
-**Prerequisites**: Both servers from above must be running in separate terminals!
+### OPTION A: Automated Demo (Recommended)
 
-Use a **third terminal** or **new PowerShell/Command window** to execute these commands:
+**Simplest way to test the complete system:**
 
-**Terminal 3 - Register Franchise** (get FID):
 ```bash
-python -c "
-import requests
-response = requests.post('http://localhost:5000/api/register/franchise', 
-    json={
-        'name': 'ChargeCo', 
-        'zoneCode': 'ZONE_A', 
-        'password': 'franchise_pass_123',
-        'initialBalance': 5000.0
-    })
-print(response.json())
-"
+# Terminal 3: Run the comprehensive demo
+python DEMO_CLEAN_WORKFLOW.py
 ```
 
-**Register User** (save UID and VMID from response):
+This script executes the complete workflow automatically with proper error handling.
+
+**Output will show:**
+- ✅ User & Franchise Registration
+- ✅ QR Code Generation with ASCON-128 encryption
+- ✅ Successful Payment Authorization
+- ✅ Failed Payment (Wrong PIN)
+- ✅ Failed Payment (Insufficient Balance)  
+- ✅ Transaction Reversal & Refund (Dispute Processing)
+- ✅ Blockchain Verification
+
+---
+
+### OPTION B: Manual Step-by-Step
+
+**If you prefer to execute commands manually:**
+
+Use Terminal 3 with these commands in order. **CRITICAL**: Always use the **exact VMID, FID, and UID from the registration responses**.
+
+#### Step 1: Register Franchise
 ```bash
-python -c "
-import requests
-response = requests.post('http://localhost:5000/api/register/user',
-    json={
-        'name': 'john_doe', 
-        'mobile': '9876543210',
-        'zoneCode': 'ZONE_A',
-        'password': 'user_pass_456',
-        'pin': '1234',
-        'initialBalance': 2000.0
-    })
-result = response.json()
-print(f'UID: {result.get(\"uid\")}')
-print(f'VMID: {result.get(\"vmid\")}')
-"
+python -c "import requests; r = requests.post('http://localhost:5000/api/register/franchise', json={'name': 'ChargeCo', 'zoneCode': 'ZONE_A', 'password': 'pass123', 'initialBalance': 5000}); print('FID:', r.json()['fid'])"
+```
+**Copy the FID from output!**
+
+#### Step 2: Register User  
+```bash
+python -c "import requests; r = requests.post('http://localhost:5000/api/register/user', json={'name': 'john', 'mobile': '9876543210', 'zoneCode': 'ZONE_A', 'password': 'pass456', 'pin': '1234', 'initialBalance': 2000}); print('VMID:', r.json()['vmid'])"
+```
+**Copy the VMID from output!**
+
+#### Step 3: Load FID at Kiosk
+```bash
+# Replace E9F1D45DDCDB7784 with YOUR FID from Step 1
+python -c "import requests; r = requests.post('http://localhost:5001/kiosk/load-fid', json={'fid': 'E9F1D45DDCDB7784'}); print(r.json())"
 ```
 
-**Get Franchise ID** (extract FID from franchise registration):
+#### Step 4: View QR Details
 ```bash
-python -c "
-import requests
-response = requests.post('http://localhost:5000/api/register/franchise', 
-    json={
-        'name': 'ChargeCo', 
-        'zoneCode': 'ZONE_A', 
-        'password': 'franchise_pass_123',
-        'initialBalance': 5000.0
-    })
-result = response.json()
-print(f'FID: {result.get(\"fid\")}')
-"
+python -c "import requests; r = requests.get('http://localhost:5001/kiosk/qr/details'); import json; print(json.dumps(r.json()['qr_payload'], indent=2))"
+```
+Shows encrypted VFID and nonce in QR payload.
+
+#### Step 5: Successful Payment
+```bash
+# Replace 43A05778551131E2 with YOUR VMID from Step 2
+python -c "import requests; r = requests.post('http://localhost:5001/kiosk/payment', json={'vmid': '43A05778551131E2', 'pin': '1234', 'amount': 45.50}); print(r.json())"
+```
+**Expected**: `"approved": true`
+
+#### Step 6: Wrong PIN Test
+```bash
+# Replace 43A05778551131E2 with YOUR VMID
+python -c "import requests; r = requests.post('http://localhost:5001/kiosk/payment', json={'vmid': '43A05778551131E2', 'pin': '9999', 'amount': 45.50}); print(r.json())"
+```
+**Expected**: `"approved": false, "message": "Invalid PIN"`
+
+#### Step 7: Insufficient Balance Test
+```bash
+# Replace 43A05778551131E2 with YOUR VMID
+python -c "import requests; r = requests.post('http://localhost:5001/kiosk/payment', json={'vmid': '43A05778551131E2', 'pin': '1234', 'amount': 50000}); print(r.json())"
+```
+**Expected**: `"approved": false, "message": "Insufficient balance"`
+
+#### Step 8: Process Dispute
+```bash
+# Replace txnId with actual ID from successful payment
+python -c "import requests; r = requests.post('http://localhost:5000/api/dispute', json={'txnId': 'a701be718bec1682db8e12c63fddfc32a41d77ea8d27d110dcc6a162310bcc65', 'reason': 'User dispute'}); print(r.json())"
 ```
 
-**Load FID at Kiosk** (first step before QR generation):
+#### Step 9: View Blockchain
 ```bash
-python -c "
-import requests
-# Use FID from franchise registration, e.g., C16230553D5200BA
-response = requests.post('http://localhost:5001/kiosk/load-fid',
-    json={'fid': 'C16230553D5200BA'})
-result = response.json()
-print(f'Kiosk Ready: {result.get(\"qrReady\")}')
-"
+python -c "import requests; r = requests.get('http://localhost:5000/api/ledger'); import json; print(json.dumps(r.json()[-2:], indent=2))"  
 ```
 
-**Retrieve Generated QR Code**:
+---
+
+### ⚠️ Common Issues & Fixes
+
+**Problem**: `"Unknown VMID"`
 ```bash
-python -c "
-import requests
-response = requests.get('http://localhost:5001/kiosk/qr')
-# This returns PNG image - save it to file or display
-with open('qr_code.png', 'wb') as f:
-    f.write(response.content)
-print('QR code saved to qr_code.png')
-"
+❌ WRONG: Uses old/stale VMID from previous registration
+✅ FIX: Always use VMID from CURRENT registration session
 ```
 
-**Process Payment at Kiosk** (with user credentials):
-```bash
-python -c "
-import requests
-# Use VMID from user registration
-response = requests.post('http://localhost:5001/kiosk/payment',
-    json={
-        'vmid': 'VMID_FROM_USER_REGISTRATION',
-        'pin': '1234',
-        'amount': 45.50
-    })
-result = response.json()
-print(f'Approved: {result.get(\"approved\")}')
-print(f'Message: {result.get(\"message\")}')
-if result.get('approved'):
-    print(f'Transaction ID: {result.get(\"txnId\")}')
-    print(f'User Balance: {result.get(\"userBalance\")}')
-"
+**Problem**: `"Replay attack detected"` on retry
+```bash  
+❌ REASON: Loading same FID twice re-encrypts with same nonce
+✅ FIX: Reload FID at kiosk before each payment test
+       python -c "import requests; requests.post('http://localhost:5001/kiosk/load-fid', json={'fid': 'E9F1D45DDCDB7784'})"
 ```
 
-**View Ledger**:
+**Problem**: Servers not responding
 ```bash
-python -c "
-import requests
-response = requests.get('http://localhost:5000/api/ledger')
-ledger = response.json()
-print(f'Total Blocks: {len(ledger.get(\"blocks\", []))}')
-for block in ledger.get('blocks', [])[:5]:
-    print(f'  Block {block[\"index\"]}: {block[\"txn_id\"]} - Amount: {block[\"amount\"]}'
-)
-"
+❌ REASON: Servers not started or port conflict
+✅ FIX: Check ports are free
+       netstat -ano | findstr :5000
+       netstat -ano | findstr :5001
 ```
 
-**Verify Ledger Integrity**:
-```bash
-python -c "
-import requests
-response = requests.get('http://localhost:5000/api/ledger/verify')
-result = response.json()
-print(f'Chain Valid: {result.get(\"valid\")}')
-print(f'Chain Length: {result.get(\"chainLength\")}')
-"
-```
 
 ---
 
@@ -417,10 +401,28 @@ python quantum/shors_simulation.py
 
 ---
 
-## 7. Testing
+## 7. Testing Guide
+
+### Automated Testing
 
 ```bash
-# Run all tests
+# Run the complete automated demo with all test cases
+python DEMO_CLEAN_WORKFLOW.py
+```
+
+This script tests:
+- ✅ User and franchise registration
+- ✅ ASCON-128 QR encryption/decryption
+- ✅ Successful payment authorization
+- ✅ Wrong PIN failure case
+- ✅ Insufficient balance failure case
+- ✅ Transaction dispute and reversal
+- ✅ Blockchain integrity verification
+
+### Manual Unit Tests
+
+```bash
+# Run all unit tests
 python verify_system.py
 
 # Individual test files
