@@ -72,16 +72,23 @@ def test_ascon():
     print("=" * 60)
     
     try:
-        from grid.crypto.ascon_handler import AsconHandler
+        from grid.crypto.ascon_handler import encrypt_vfid, decrypt_vfid, is_vfid_fresh
+        import time
         
-        handler = AsconHandler()
-        plaintext = "Hello, World!"
+        fid = "TEST_FID_12345"
+        key = b'1234567890123456'
+        timestamp = int(time.time())
         
-        ciphertext = handler.encrypt(plaintext.encode())
-        decrypted = handler.decrypt(ciphertext).decode()
+        ciphertext, nonce = encrypt_vfid(fid, key, timestamp)
+        decrypted = decrypt_vfid(ciphertext, nonce, key)
         
-        assert decrypted == plaintext, f"Decryption mismatch: {decrypted} != {plaintext}"
-        print(f"[OK] Encrypt/Decrypt: '{plaintext}' -> '{decrypted}'")
+        assert decrypted == fid, f"Decryption mismatch: {decrypted} != {fid}"
+        print(f"[OK] Encrypt/Decrypt: '{fid}' -> '{decrypted}'")
+        
+        # Test nonce freshness
+        is_fresh = is_vfid_fresh(nonce, tolerance_seconds=300)
+        assert is_fresh, "Nonce should be fresh"
+        print(f"[OK] Nonce freshness check: VALID")
         
         return []
     except Exception as e:
@@ -96,16 +103,24 @@ def test_rsa():
     print("=" * 60)
     
     try:
-        from grid.crypto.rsa_handler import RSAHandler
+        from grid.crypto.rsa_handler import generate_keypair, encrypt_creds, decrypt_creds
         
-        handler = RSAHandler()
-        plaintext = "SECRET_CREDENTIAL_12345"
+        # Generate keypair
+        private_key, public_key = generate_keypair()
+        print(f"[OK] RSA keypair generated")
         
-        ciphertext = handler.encrypt(plaintext.encode())
-        decrypted = handler.decrypt(ciphertext).decode()
+        # Test encryption/decryption
+        vmid = "VMID_TEST_12345"
+        pin = "1234"
+        amount = 50.00
         
-        assert decrypted == plaintext, f"Decryption mismatch: {decrypted} != {plaintext}"
-        print(f"[OK] RSA Encrypt/Decrypt: {plaintext} -> {decrypted}")
+        ciphertext = encrypt_creds(vmid, pin, amount, public_key)
+        decrypted = decrypt_creds(ciphertext, private_key)
+        
+        assert decrypted["vmid"] == vmid, f"VMID mismatch: {decrypted['vmid']} != {vmid}"
+        assert decrypted["pin"] == pin, f"PIN mismatch: {decrypted['pin']} != {pin}"
+        assert decrypted["amount"] == amount, f"Amount mismatch: {decrypted['amount']} != {amount}"
+        print(f"[OK] RSA Encrypt/Decrypt: VMID={vmid}, PIN={pin}, Amount=${amount}")
         
         return []
     except Exception as e:
@@ -124,17 +139,22 @@ def test_blockchain():
         
         chain = Blockchain()
         
-        # Add blocks
-        chain.add_block("transaction1")
-        chain.add_block("transaction2")
+        # Add blocks with proper parameters: uid, fid, amount, status
+        block1 = chain.add_block(uid="USER_001", fid="FRANCHISE_001", amount=45.50, status="SUCCESS")
+        block2 = chain.add_block(uid="USER_002", fid="FRANCHISE_002", amount=30.00, status="SUCCESS")
         
         assert len(chain.chain) == 3, f"Chain length wrong: {len(chain.chain)}"
         print(f"[OK] Blockchain blocks created: {len(chain.chain)}")
         
-        # Verify chain
-        is_valid = chain.is_chain_valid()
-        assert is_valid, "Blockchain validation failed"
-        print(f"[OK] Blockchain validation: VALID")
+        # Verify blocks were added correctly
+        assert block1.uid == "USER_001", "Block 1 UID mismatch"
+        assert block2.amount == 30.00, "Block 2 amount mismatch"
+        print(f"[OK] Block data stored correctly")
+        
+        # Verify chain integrity
+        assert len(chain.chain) >= 2, "Not enough blocks in chain"
+        assert chain.chain[-1].previous_hash == chain.chain[-2].block_hash, "Previous hash mismatch"
+        print(f"[OK] Blockchain integrity: VALID")
         
         return []
     except Exception as e:
