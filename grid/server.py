@@ -121,22 +121,32 @@ def authorize():
         pin = creds.get('pin')
         amount = float(creds.get('amount', 0))
         
+        print(f"\n[AUTH]      VMID: {vmid}, Amount: ${amount}")
+        
         user = registry.lookup_user_by_vmid(vmid)
         if not user:
+            print("[REJECT]    Unknown VMID")
             return jsonify({"approved": False, "message": "Unknown VMID"}), 200
         
         fail_key = f"{vmid}_session"
         if fail_key in pin_fail_counter and pin_fail_counter[fail_key] >= PIN_FAIL_LIMIT:
+            print("[REJECT]    PIN locked after failed attempts")
             return jsonify({"approved": False, "message": "PIN locked after failed attempts"}), 200
         
         if not registry.verify_pin(vmid, pin):
             pin_fail_counter[fail_key] = pin_fail_counter.get(fail_key, 0) + 1
+            attempts_left = PIN_FAIL_LIMIT - pin_fail_counter[fail_key]
+            print(f"[REJECT]    ❌ WRONG PIN - Entered: {pin}, Attempts Remaining: {attempts_left}")
             return jsonify({"approved": False, "message": "Invalid PIN"}), 200
         
         pin_fail_counter[fail_key] = 0
+        print("[PIN]       ✅ PIN Verified")
         
         if user.balance < amount:
+            print(f"[REJECT]    ❌ INSUFFICIENT BALANCE - Account: ${user.balance}, Requested: ${amount}")
             return jsonify({"approved": False, "message": "Insufficient balance"}), 200
+        
+        print(f"[BALANCE]   ✅ Balance Sufficient - Current: ${user.balance}")
         
         registry.deduct_balance(vmid, amount)
         
@@ -163,24 +173,55 @@ def dispute():
         txn_id = data.get('txnId')
         reason = data.get('reason', 'User dispute')
         
+        print("\n" + "="*70)
+        print("DISPUTE PROCESSING - TRANSACTION REVERSAL")
+        print("="*70)
+        print(f"[TXNID]     Original Transaction:     {txn_id}")
+        print(f"[REASON]    Dispute Reason:          {reason}")
+        
         original_block = blockchain.find_block(txn_id)
         if not original_block:
+            print("[ERROR]     Transaction not found in ledger")
+            print("="*70 + "\n")
             return jsonify({"error": "Transaction not found"}), 404
+        
+        print(f"[ORIGINAL]  Original Amount:         ${original_block.amount}")
+        print(f"[USER]      User ID:                 {original_block.uid}")
+        print(f"[FID]       Franchise ID:            {original_block.fid}")
         
         user = registry.lookup_user_by_vmid(original_block.uid)
         if user:
+            original_balance = user.balance
             user.balance += original_block.amount
+            print(f"[REFUND]    Original Balance:        ${original_balance}")
+            print(f"[REFUND]    Refund Amount:          ${original_block.amount}")
+            print(f"[REFUND]    New Balance:            ${user.balance}")
+        else:
+            print("[WARNING]   User not found for refund")
         
         reverse_block = blockchain.add_reverse(txn_id, reason)
+        reverse_block.dispute_flag = True
+        reverse_block.seal()
+        blockchain.chain[-1] = reverse_block
+        
         save_blockchain()
+        
+        print(f"[REVERSE]   Reverse TxnID:           {reverse_block.txn_id}")
+        print("[STATUS]    ✅ DISPUTE PROCESSED - Transaction Reversed")
+        print(f"[DISPUTE_FLAG] dispute_flag = {reverse_block.dispute_flag}")
+        print("="*70 + "\n")
         
         return jsonify({
             "refunded": True,
             "reverseTxnId": reverse_block.txn_id,
-            "refundAmount": original_block.amount
+            "refundAmount": original_block.amount,
+            "message": "Transaction reversed and refund issued",
+            "dispute_flag": True
         }), 200
         
     except Exception as e:
+        print(f"[ERROR]     {str(e)}")
+        print("="*70 + "\n")
         return jsonify({"error": str(e)}), 500
 
 

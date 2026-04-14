@@ -113,6 +113,37 @@ def get_qr():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/kiosk/qr/details', methods=['GET'])
+def qr_details():
+    """Return QR payload details for demo/evaluation"""
+    try:
+        if not kiosk_fid or not kiosk_vfid_ciphertext or not kiosk_vfid_nonce:
+            return jsonify({"error": "No QR code available"}), 400
+        
+        print("\n" + "="*70)
+        print("QR CODE PAYLOAD DETAILS")
+        print("="*70)
+        print(f"[FID]       Franchise ID:             {kiosk_fid}")
+        print(f"[VFID]      Encrypted VFID:          {base64.b64encode(kiosk_vfid_ciphertext).decode()[:50]}...")
+        print(f"[NONCE]     Encryption Nonce:        {base64.b64encode(kiosk_vfid_nonce).decode()}")
+        print("[STATUS]    ✅ QR Code Ready - Scan to Authorize Payment")
+        print("="*70 + "\n")
+        
+        payload = {
+            "fid": kiosk_fid,
+            "vfid_encrypted": base64.b64encode(kiosk_vfid_ciphertext).decode(),
+            "nonce": base64.b64encode(kiosk_vfid_nonce).decode(),
+            "timestamp": json.loads(kiosk_vfid_timestamp)
+        }
+        
+        return jsonify({
+            "qr_payload": payload,
+            "message": "QR code contains encrypted FID and nonce for secure transmission"
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/kiosk/payment', methods=['POST'])
 def payment():
     try:
@@ -178,12 +209,14 @@ def payment():
                         "userBalance": auth_result.get('userBalance')
                     }), 200
                 else:
-                    print(f"[REJECT]    {auth_result.get('message', 'Transaction rejected')}")
+                    reason = auth_result.get('message', 'Transaction rejected')
+                    print("[PAYMENT]   Amount: $" + str(amount))
+                    print(f"[REASON]    {reason}")
                     print("[STATUS]    ❌ PAYMENT REJECTED")
                     print("="*70 + "\n")
                     return jsonify({
                         "approved": False,
-                        "message": auth_result.get('message', 'Transaction rejected')
+                        "message": reason
                     }), 200
             else:
                 print("[ERROR]     Grid returned error")
