@@ -1,0 +1,12 @@
+flask>=3.0
+requests>=2.31
+pycryptodome>=3.20
+ascon>=1.0
+qrcode[pil]>=7.4
+Pillow>=10.0
+sympy>=1.12
+pyzbar>=0.1.9
+qiskit>=1.0
+qiskit-aer>=0.13
+pytest>=8.0
+python-dateutil>=2.8.2
