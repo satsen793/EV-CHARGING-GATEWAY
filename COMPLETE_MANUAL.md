@@ -263,37 +263,63 @@ print(f'VMID: {result.get(\"vmid\")}')
 "
 ```
 
-**Generate QR Code at Kiosk** (requires registered VMID):
+**Get Franchise ID** (extract FID from franchise registration):
 ```bash
 python -c "
 import requests
-# Replace VMID with actual value from user registration
-response = requests.post('http://localhost:5001/api/qr/generate',
+response = requests.post('http://localhost:5000/api/register/franchise', 
     json={
-        'vmid': 'YOUR_VMID_HERE',
-        'fid': 'ZONE_A',
-        'amount': 45.50
+        'name': 'ChargeCo', 
+        'zoneCode': 'ZONE_A', 
+        'password': 'franchise_pass_123',
+        'initialBalance': 5000.0
     })
 result = response.json()
-print(f'QR Generated: {result}')
-print(f'Store encrypted_vfid and nonce for authorization')
+print(f'FID: {result.get(\"fid\")}')
 "
 ```
 
-**Authorize Payment** (using encrypted credentials from QR):
+**Load FID at Kiosk** (first step before QR generation):
 ```bash
 python -c "
 import requests
-# This requires base64-encoded encrypted credentials from the QR encryption process
-# Use the vfid, vfidNonce, and encrypted credentials from the QR generation step
-response = requests.post('http://localhost:5000/api/authorize',
+# Use FID from franchise registration, e.g., C16230553D5200BA
+response = requests.post('http://localhost:5001/kiosk/load-fid',
+    json={'fid': 'C16230553D5200BA'})
+result = response.json()
+print(f'Kiosk Ready: {result.get(\"qrReady\")}')
+"
+```
+
+**Retrieve Generated QR Code**:
+```bash
+python -c "
+import requests
+response = requests.get('http://localhost:5001/kiosk/qr')
+# This returns PNG image - save it to file or display
+with open('qr_code.png', 'wb') as f:
+    f.write(response.content)
+print('QR code saved to qr_code.png')
+"
+```
+
+**Process Payment at Kiosk** (with user credentials):
+```bash
+python -c "
+import requests
+# Use VMID from user registration
+response = requests.post('http://localhost:5001/kiosk/payment',
     json={
-        'encryptedCredentials': 'BASE64_ENCODED_CIPHERTEXT',
-        'vfid': 'BASE64_ENCODED_VMID',
-        'vfidNonce': 'BASE64_ENCODED_NONCE',
-        'vfidTimestamp': 1712000000
+        'vmid': 'VMID_FROM_USER_REGISTRATION',
+        'pin': '1234',
+        'amount': 45.50
     })
-print(f'Authorization: {response.json()}')
+result = response.json()
+print(f'Approved: {result.get(\"approved\")}')
+print(f'Message: {result.get(\"message\")}')
+if result.get('approved'):
+    print(f'Transaction ID: {result.get(\"txnId\")}')
+    print(f'User Balance: {result.get(\"userBalance\")}')
 "
 ```
 
@@ -307,6 +333,17 @@ print(f'Total Blocks: {len(ledger.get(\"blocks\", []))}')
 for block in ledger.get('blocks', [])[:5]:
     print(f'  Block {block[\"index\"]}: {block[\"txn_id\"]} - Amount: {block[\"amount\"]}'
 )
+"
+```
+
+**Verify Ledger Integrity**:
+```bash
+python -c "
+import requests
+response = requests.get('http://localhost:5000/api/ledger/verify')
+result = response.json()
+print(f'Chain Valid: {result.get(\"valid\")}')
+print(f'Chain Length: {result.get(\"chainLength\")}')
 "
 ```
 
@@ -390,45 +427,54 @@ python tests/test_registry.py
 
 ## 8. Expected Outputs
 
-### Successful Authorization
+### Franchise Registration
 ```json
 {
-  "status": "authorized",
-  "txn_id": "9c22ff5f21f0b81b1234567890abcdef",
-  "amount": 45.5,
-  "new_balance": 454.5,
-  "message": "Payment authorized successfully"
+  "fid": "C16230553D5200BA",
+  "message": "Franchise registered successfully"
 }
 ```
 
-### Blockchain Ledger
+### User Registration
 ```json
 {
-  "block_count": 2,
-  "blocks": [
-    {"index": 0, "status": "genesis", "amount": 0.0},
-    {"index": 1, "status": "completed", "amount": 45.5}
-  ]
+  "uid": "A1B2C3D4E5F6G7H8",
+  "vmid": "7F8E9D0C1B2A3F4E",
+  "message": "User registered successfully"
+}
+```
+
+### Load FID at Kiosk
+```json
+{
+  "message": "FID loaded",
+  "qrReady": true
+}
+```
+
+### Successful Payment Authorization
+```json
+{
+  "approved": true,
+  "message": "Transaction approved. Charging authorized.",
+  "txnId": "9c22ff5f21f0b81b1234567890abcdef",
+  "userBalance": 1954.50
 }
 ```
 
 ### Insufficient Balance
 ```json
 {
-  "status": "rejected",
-  "reason": "insufficient_balance",
-  "current_balance": 25.0,
-  "requested_amount": 50.0
+  "approved": false,
+  "message": "Insufficient balance"
 }
 ```
 
-### Wrong PIN
+### Invalid PIN
 ```json
 {
-  "status": "rejected",
-  "reason": "invalid_pin",
-  "attempts_remaining": 2,
-  "message": "PIN verification failed"
+  "approved": false,
+  "message": "Invalid PIN"
 }
 ```
 
@@ -494,12 +540,19 @@ Hash chain is broken—indicates tampering. Check individual block hashes.
 
 **Setup**: Clone, install dependencies, verify with `verify_system.py`
 
-**Run**: Start Grid server + Kiosk server in separate terminals
+**Run**: Start Grid server (port 5000) + Kiosk server (port 5001) in separate terminals
 
-**Test**: Register user/franchise, generate QR, authorize payment, view ledger
+**Complete Flow**:
+1. Register franchise at Grid → Get FID
+2. Register user at Grid → Get UID and VMID 
+3. Load FID at Kiosk (`/kiosk/load-fid`)
+4. Retrieve QR code from Kiosk (`/kiosk/qr`)
+5. Process payment at Kiosk (`/kiosk/payment` with VMID, PIN, amount)
+6. Transaction recorded on blockchain with immutable hash chain
+7. View ledger and verify integrity
 
-**Features**: Keccak-256 IDs, ASCON encryption, RSA credentials, SHA-3 blockchain, Shor's quantum demo
+**Features**: Keccak-256 IDs, ASCON-128 encryption, RSA-2048 credentials, SHA-3 blockchain, Shor's quantum demo, immutable transaction records
 
-**Production**: Replace in-memory storage, add TLS, implement load balancing, use HSM for keys
+**Production**: Replace in-memory storage with PostgreSQL, add TLS/HTTPS, implement load balancing, use Hardware Security Module (HSM) for keys
 
 The system is production-ready!
