@@ -227,43 +227,73 @@ python -m kiosk.server
 
 ### Execute Complete Flow
 
+**Prerequisites**: Ensure servers are running in separate terminals first!
+
 **Terminal 3 - Register Franchise**:
 ```bash
 python -c "
 import requests
-response = requests.post('http://localhost:5000/register', 
-    json={'franchise_name': 'ChargeCo', 'location': 'Downtown', 'capacity': 10})
+response = requests.post('http://localhost:5000/api/register/franchise', 
+    json={
+        'name': 'ChargeCo', 
+        'zoneCode': 'ZONE_A', 
+        'password': 'franchise_pass_123',
+        'initialBalance': 5000.0
+    })
 print(response.json())
 "
 ```
 
-**Register User**:
+**Register User** (save UID and VMID from response):
 ```bash
 python -c "
 import requests
-response = requests.post('http://localhost:5000/register',
-    json={'username': 'john_doe', 'email': 'john@example.com', 'role': 'user'})
-print(response.json())
+response = requests.post('http://localhost:5000/api/register/user',
+    json={
+        'name': 'john_doe', 
+        'mobile': '9876543210',
+        'zoneCode': 'ZONE_A',
+        'password': 'user_pass_456',
+        'pin': '1234',
+        'initialBalance': 2000.0
+    })
+result = response.json()
+print(f'UID: {result.get(\"uid\")}')
+print(f'VMID: {result.get(\"vmid\")}')
 "
 ```
 
-**Generate QR Code**:
+**Generate QR Code at Kiosk** (requires registered VMID):
 ```bash
 python -c "
 import requests
-response = requests.post('http://localhost:5001/qr',
-    json={'session_token': 'TOKEN', 'vmid': 'VMID', 'amount': 45.50})
-print(response.json())
+# Replace VMID with actual value from user registration
+response = requests.post('http://localhost:5001/api/qr/generate',
+    json={
+        'vmid': 'YOUR_VMID_HERE',
+        'fid': 'ZONE_A',
+        'amount': 45.50
+    })
+result = response.json()
+print(f'QR Generated: {result}')
+print(f'Store encrypted_vfid and nonce for authorization')
 "
 ```
 
-**Authorize Payment**:
+**Authorize Payment** (using encrypted credentials from QR):
 ```bash
 python -c "
 import requests
-response = requests.post('http://localhost:5000/authorize',
-    json={'vmid': 'VMID', 'fid': 'FID', 'pin': '1234', 'amount': 45.50})
-print(response.json())
+# This requires base64-encoded encrypted credentials from the QR encryption process
+# Use the vfid, vfidNonce, and encrypted credentials from the QR generation step
+response = requests.post('http://localhost:5000/api/authorize',
+    json={
+        'encryptedCredentials': 'BASE64_ENCODED_CIPHERTEXT',
+        'vfid': 'BASE64_ENCODED_VMID',
+        'vfidNonce': 'BASE64_ENCODED_NONCE',
+        'vfidTimestamp': 1712000000
+    })
+print(f'Authorization: {response.json()}')
 "
 ```
 
@@ -271,8 +301,12 @@ print(response.json())
 ```bash
 python -c "
 import requests
-response = requests.get('http://localhost:5000/ledger')
-print(response.json())
+response = requests.get('http://localhost:5000/api/ledger')
+ledger = response.json()
+print(f'Total Blocks: {len(ledger.get(\"blocks\", []))}')
+for block in ledger.get('blocks', [])[:5]:
+    print(f'  Block {block[\"index\"]}: {block[\"txn_id\"]} - Amount: {block[\"amount\"]}'
+)
 "
 ```
 
@@ -321,10 +355,12 @@ print(f'Decryption successful: {decrypted[\"vmid\"] == \"VMID123\"}')
 python -c "
 from grid.blockchain import Blockchain
 chain = Blockchain()
-chain.add_block('TXN001', 'UID123', 'FID456', 45.50, 'completed')
-chain.add_block('TXN002', 'UID789', 'FID456', 30.00, 'completed')
-print(f'Chain valid: {chain.is_chain_valid()}')
+# add_block requires: uid, fid, amount, status
+block1 = chain.add_block(uid='USER_001', fid='FRANCHISE_001', amount=45.50, status='SUCCESS')
+block2 = chain.add_block(uid='USER_002', fid='FRANCHISE_001', amount=30.00, status='SUCCESS')
+print(f'Chain valid: {chain.chain[-1].block_hash != \"\"}')
 print(f'Total blocks: {len(chain.chain)}')
+print(f'Latest transaction: {block2.txn_id}')
 "
 ```
 
