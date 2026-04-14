@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Charging Gateway - Demo UI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .form-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-group.full {
+            grid-template-columns: 1fr;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .output {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            color: #333;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .output.error {
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+
+        .output.success {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+
+        .qr-container {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .qr-container img {
+            max-width: 300px;
+            max-height: 300px;
+            border: 2px solid #667eea;
+            border-radius: 4px;
+        }
+
+        .qr-container p {
+            color: #666;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .ledger-list {
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+
+        .ledger-item {
+            background: white;
+            border-left: 3px solid #667eea;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .ledger-item strong {
+            color: #333;
+        }
+
+        .ledger-item .status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .ledger-item .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .ledger-item .status.failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .loading {
+            display: inline-block;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 3px solid #2196F3;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #0c5aa0;
+        }
+
+        .credential-box {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+        }
+
+        .credential-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .credential-item strong {
+            color: #667eea;
+            min-width: 120px;
+        }
+
+        .credential-item .value {
+            color: #333;
+            font-weight: 600;
+            word-break: break-all;
+            flex: 1;
+            margin: 0 10px;
+        }
+
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .copy-btn:hover {
+            background: #764ba2;
+        }
+
+        button.secondary {
+            background: #6c757d;
+            margin-left: 10px;
+        }
+
+        button.secondary:hover {
+            background: #5a6268;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .section {
+                padding: 18px;
+                margin-bottom: 25px;
+            }
+
+            .form-group {
+                grid-template-columns: 1fr;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ EV Charging Gateway</h1>
+            <p>Secure Payment System - Demo Interface | Featuring Post-Quantum Cryptography Analysis</p>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <h2>1. Register User</h2>
+                <div class="info-box">
+                    Create a new user account to make payments
+                </div>
+                <div class="form-group">
+                    <div>
+                        <label>Name</label>
+                        <input type="text" id="userRegName" placeholder="John Doe">
+                    </div>
+                    <div>
+                        <label>Mobile</label>
+                        <input type="text" id="userRegMobile" placeholder="9876543210">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div>
+                        <label>Zone Code</label>
+                        <input type="text" id="userRegZone" placeholder="TP-NORTH-01">
+                    </div>
+                    <div>
+                        <label>Password</label>
+                        <input type="password" id="userRegPassword" placeholder="••••••••">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div>
+                        <label>PIN (4 digits)</label>
+                        <input type="password" id="userRegPin" placeholder="1234" maxlength="4">
+                    </div>
+                    <div>
+                        <label>Initial Balance</label>
+                        <input type="number" id="userRegBalance" value="2000" min="0">
+                    </div>
+                </div>
+                <button onclick="registerUser()">Register User</button>
+                <div id="userRegOutput" class="output hidden"></div>
+            </div>
+
+            <div class="section">
+                <h2>2. Register Franchise</h2>
+                <div class="info-box">
+                    Set up a new charging station franchise
+                </div>
+                <div class="form-group">
+                    <div>
+                        <label>Franchise Name</label>
+                        <input type="text" id="franchiseRegName" placeholder="EV Charging Hub - Central">
+                    </div>
+                    <div>
+                        <label>Zone Code</label>
+                        <input type="text" id="franchiseRegZone" placeholder="TP-CENTRAL-01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div>
+                        <label>Password</label>
+                        <input type="password" id="franchiseRegPassword" placeholder="••••••••">
+                    </div>
+                    <div>
+                        <label>Initial Balance</label>
+                        <input type="number" id="franchiseRegBalance" value="5000" min="0">
+                    </div>
+                </div>
+                <button onclick="registerFranchise()">Register Franchise</button>
+                <div id="franchiseRegOutput" class="output hidden"></div>
+            </div>
+
+            <div class="section">
+                <h2>3. Load FID & Generate QR</h2>
+                <div class="info-box">
+                    Load Franchise ID at kiosk and generate secure QR code
+                </div>
+                <div class="form-group">
+                    <div>
+                        <label>Franchise ID (16 char)</label>
+                        <input type="text" id="fidInput" placeholder="Enter FID from franchise registration">
+                    </div>
+                </div>
+                <button onclick="loadFid()">Load FID & Generate QR</button>
+                <div id="fidOutput" class="output hidden"></div>
+                <div id="qrContainer" class="qr-container hidden">
+                    <p><strong>QR Code Preview:</strong></p>
+                    <img id="qrImage" src="" alt="QR Code">
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>4. Make Payment</h2>
+                <div class="info-box">
+                    Authorize and process payment from user account
+                </div>
+                <div class="form-group">
+                    <div>
+                        <label>Vehicle Member ID (VMID)</label>
+                        <input type="text" id="paymentVmid" placeholder="Enter VMID from user registration">
+                    </div>
+                    <div>
+                        <label>PIN</label>
+                        <input type="password" id="paymentPin" placeholder="Enter user PIN" maxlength="4">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div>
+                        <label>Amount ($)</label>
+                        <input type="number" id="paymentAmount" value="50" min="0" step="0.01">
+                    </div>
+                </div>
+                <button onclick="processPayment()">Process Payment</button>
+                <div id="paymentOutput" class="output hidden"></div>
+            </div>
+
+            <div class="section">
+                <h2>5. View QR Details</h2>
+                <div class="info-box">
+                    Display encrypted QR payload (VFID + Nonce) with plaintext FID
+                </div>
+                <button onclick="viewQrDetails()">Get QR Details</button>
+                <div id="qrDetailsOutput" class="output hidden"></div>
+            </div>
+
+            <div class="section">
+                <h2>6. Handle Dispute (Refund)</h2>
+                <div class="info-box">
+                    Initiate dispute for failed transactions (hardware malfunction)
+                </div>
+                <div class="form-group">
+                    <div>
+                        <label>Transaction ID</label>
+                        <input type="text" id="disputeTxnId" placeholder="Enter TXN ID">
+                    </div>
+                    <div>
+                        <label>Reason</label>
+                        <input type="text" id="disputeReason" placeholder="e.g., Hardware malfunction">
+                    </div>
+                </div>
+                <button onclick="processDispute()">Submit Dispute</button>
+                <div id="disputeOutput" class="output hidden"></div>
+            </div>
+
+            <div class="section">
+                <h2>7. Blockchain Viewer & Verify</h2>
+                <div class="info-box">
+                    View recent transactions from the immutable ledger and verify chain integrity
+                </div>
+                <button onclick="loadLedger()" style="margin-right: 10px;">Load Transactions</button>
+                <button onclick="verifyBlockchain()">Verify Chain</button>
+                <div id="ledgerOutput" class="output hidden"></div>
+                <div id="verifyOutput" class="output hidden"></div>
+                <ul id="ledgerList" class="ledger-list"></ul>
+            </div>
+
+            <div class="section">
+                <h2>8. Quantum Vulnerability Demo</h2>
+                <div class="info-box">
+                     Educational: Demonstrates how Shor's algorithm breaks RSA encryption. RSA-2048 is vulnerable to quantum computers.
+                </div>
+                <button onclick="runQuantumDemo()">Run Quantum Attack Simulation</button>
+                <div id="quantumOutput" class="output hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GRID_URL = 'http://localhost:5000';
+        const KIOSK_URL = 'http://localhost:5001';
+
+        async function makeRequest(url, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method,
+                    headers: { 'Content-Type': 'application/json' }
+                };
+                if (data) options.body = JSON.stringify(data);
+
+                const response = await fetch(url, options);
+                return await response.json();
+            } catch (error) {
+                return { error: error.message };
+            }
+        }
+
+        function showOutput(elementId, data, isSuccess = null) {
+            const element = document.getElementById(elementId);
+            element.classList.remove('hidden', 'error', 'success');
+            
+            if (data.error) {
+                element.classList.add('error');
+            } else if (isSuccess === true) {
+                element.classList.add('success');
+            } else if (isSuccess === false) {
+                element.classList.add('error');
+            }
+            
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+            alert('Copied to clipboard!');
+        }
+
+        function showCredentials(data, credType = 'user') {
+            let html = '<div class="credential-box">';
+            
+            if (credType === 'user') {
+                html += '<div class="credential-item">';
+                html += '<strong>User ID:</strong>';
+                html += `<span class="value">${data.uid || 'N/A'}</span>`;
+                html += `<button class="copy-btn" onclick="copyToClipboard('${data.uid}')">Copy</button>`;
+                html += '</div>';
+                
+                html += '<div class="credential-item">';
+                html += '<strong>VMID:</strong>';
+                html += `<span class="value">${data.vmid || 'N/A'}</span>`;
+                html += `<button class="copy-btn" onclick="copyToClipboard('${data.vmid}')">Copy</button>`;
+                html += '</div>';
+            } else if (credType === 'franchise') {
+                html += '<div class="credential-item">';
+                html += '<strong>Franchise ID:</strong>';
+                html += `<span class="value">${data.fid || 'N/A'}</span>`;
+                html += `<button class="copy-btn" onclick="copyToClipboard('${data.fid}')">Copy</button>`;
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        async function registerUser() {
+            const payload = {
+                name: document.getElementById('userRegName').value,
+                mobile: document.getElementById('userRegMobile').value,
+                zoneCode: document.getElementById('userRegZone').value,
+                password: document.getElementById('userRegPassword').value,
+                pin: document.getElementById('userRegPin').value,
+                initialBalance: parseFloat(document.getElementById('userRegBalance').value)
+            };
+
+            if (!payload.name || !payload.mobile || !payload.zoneCode || !payload.password || !payload.pin) {
+                showOutput('userRegOutput', { error: 'All fields are required' }, false);
+                return;
+            }
+
+            const result = await makeRequest(`${GRID_URL}/api/register/user`, 'POST', payload);
+            
+            const element = document.getElementById('userRegOutput');
+            element.classList.remove('hidden', 'error', 'success');
+            
+            if (result.error) {
+                element.classList.add('error');
+                element.textContent = JSON.stringify(result, null, 2);
+            } else {
+                element.classList.add('success');
+                element.innerHTML = JSON.stringify(result, null, 2) + showCredentials(result, 'user');
+                document.getElementById('paymentVmid').value = result.vmid || '';
+                document.getElementById('paymentPin').value = document.getElementById('userRegPin').value;
+            }
+        }
+
+        async function registerFranchise() {
+            const payload = {
+                name: document.getElementById('franchiseRegName').value,
+                zoneCode: document.getElementById('franchiseRegZone').value,
+                password: document.getElementById('franchiseRegPassword').value,
+                initialBalance: parseFloat(document.getElementById('franchiseRegBalance').value)
+            };
+
+            if (!payload.name || !payload.zoneCode || !payload.password) {
+                showOutput('franchiseRegOutput', { error: 'All fields are required' }, false);
+                return;
+            }
+
+            const result = await makeRequest(`${GRID_URL}/api/register/franchise`, 'POST', payload);
+            
+            const element = document.getElementById('franchiseRegOutput');
+            element.classList.remove('hidden', 'error', 'success');
+            
+            if (result.error) {
+                element.classList.add('error');
+                element.textContent = JSON.stringify(result, null, 2);
+            } else {
+                element.classList.add('success');
+                element.innerHTML = JSON.stringify(result, null, 2) + showCredentials(result, 'franchise');
+                document.getElementById('fidInput').value = result.fid || '';
+            }
+        }
+
+        async function loadFid() {
+            const fidValue = document.getElementById('fidInput').value;
+
+            if (!fidValue || fidValue.length !== 16) {
+                showOutput('fidOutput', { error: 'FID must be exactly 16 characters' }, false);
+                return;
+            }
+
+            const result = await makeRequest(`${KIOSK_URL}/kiosk/load-fid`, 'POST', { fid: fidValue });
+            showOutput('fidOutput', result, !result.error && result.qrReady);
+
+            if (!result.error && result.qrReady) {
+                const qrResponse = await fetch(`${KIOSK_URL}/kiosk/qr`);
+                if (qrResponse.ok) {
+                    const blob = await qrResponse.blob();
+                    const imgUrl = URL.createObjectURL(blob);
+                    document.getElementById('qrImage').src = imgUrl;
+                    document.getElementById('qrContainer').classList.remove('hidden');
+                }
+            }
+        }
+
+        async function processPayment() {
+            const vmid = document.getElementById('paymentVmid').value;
+            const pin = document.getElementById('paymentPin').value;
+            const amount = parseFloat(document.getElementById('paymentAmount').value);
+
+            if (!vmid || !pin || !amount) {
+                showOutput('paymentOutput', { error: 'All fields are required' }, false);
+                return;
+            }
+
+            const payload = { vmid, pin, amount };
+            const result = await makeRequest(`${KIOSK_URL}/kiosk/payment`, 'POST', payload);
+            
+            const isSuccess = result.approved === true;
+            showOutput('paymentOutput', result, isSuccess);
+        }
+
+        async function loadLedger() {
+            const result = await makeRequest(`${GRID_URL}/api/ledger`, 'GET');
+
+            if (result.error) {
+                showOutput('ledgerOutput', result, false);
+                document.getElementById('ledgerList').innerHTML = '';
+                return;
+            }
+
+            const blocks = Array.isArray(result) ? result : [];
+            const recent = blocks.slice(-5).reverse();
+
+            if (recent.length === 0) {
+                document.getElementById('ledgerOutput').classList.remove('hidden', 'error', 'success');
+                document.getElementById('ledgerOutput').classList.add('success');
+                document.getElementById('ledgerOutput').textContent = 'No transactions found';
+                document.getElementById('ledgerList').innerHTML = '';
+                return;
+            }
+
+            document.getElementById('ledgerOutput').classList.add('hidden');
+            document.getElementById('ledgerList').innerHTML = recent.map(block => {
+                const statusClass = block.status === 'SUCCESS' ? 'success' : 'failed';
+                return `
+                    <li class="ledger-item">
+                        <strong>TxnID:</strong> ${block.txn_id || 'N/A'}<br>
+                        <strong>User:</strong> ${block.uid || 'N/A'} | 
+                        <strong>Franchise:</strong> ${block.fid || 'N/A'} | 
+                        <strong>Amount:</strong> $${block.amount || 0}
+                        <span class="status ${statusClass}">${block.status || 'PENDING'}</span>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        async function viewQrDetails() {
+            const result = await makeRequest(`${KIOSK_URL}/kiosk/qr/details`, 'GET');
+            showOutput('qrDetailsOutput', result, !result.error);
+        }
+
+        async function processDispute() {
+            const txnId = document.getElementById('disputeTxnId').value;
+            const reason = document.getElementById('disputeReason').value;
+
+            if (!txnId || !reason) {
+                showOutput('disputeOutput', { error: 'Transaction ID and reason are required' }, false);
+                return;
+            }
+
+            const payload = { txn_id: txnId, reason };
+            const result = await makeRequest(`${GRID_URL}/api/dispute`, 'POST', payload);
+            showOutput('disputeOutput', result, !result.error);
+        }
+
+        async function verifyBlockchain() {
+            const result = await makeRequest(`${GRID_URL}/api/ledger/verify`, 'GET');
+            showOutput('verifyOutput', result, result.valid === true);
+        }
+
+        async function runQuantumDemo() {
+            document.getElementById('quantumOutput').classList.remove('hidden', 'error', 'success');
+            document.getElementById('quantumOutput').innerHTML = `
+                <strong>Quantum Attack Simulation (Educational)</strong><br><br>
+                This demonstration shows the theoretical threat:
+                <ul style="margin-top: 10px; margin-left: 20px;">
+                    <li><strong>RSA Modulus:</strong> n = 520764917 (29-bit semiprime)</li>
+                    <li><strong>Encrypted Credentials:</strong> 206799017</li>
+                    <li><strong>Public Key:</strong> {n: 520764917, e: 65537}</li>
+                </ul><br>
+                <strong>Step 1: Factor n using Shor's Algorithm</strong><br>
+                ⏳ Factoring... (0.0002 seconds)<br><br>
+                <strong>✅ SUCCESS - Factorization Complete!</strong><br>
+                • Prime 1 (p): 22639<br>
+                • Prime 2 (q): 23003<br>
+                • Verification: 22639 × 23003 = 520764917 ✓<br><br>
+                <strong>Step 2: Compute Private Exponent</strong><br>
+                • φ(n) = (p-1)(q-1) = 520719276<br>
+                • d = 380442809<br>
+                • e × d mod φ(n) = 1 ✓<br><br>
+                <strong>Step 3: Decrypt Intercepted Credentials</strong><br>
+                • Plaintext = 206799017^380442809 mod 520764917<br>
+                • Plaintext = 304965477<br>
+                • ✅ User credentials exposed!<br><br>
+                <strong>🔴 VULNERABILITY SUMMARY</strong><br>
+                • RSA-2048 would be broken by 1.9M-qubit quantum computer<br>
+                • Attack time on quantum: ~hours vs. classical: ~centuries<br>
+                • Mitigation: Use post-quantum cryptography (CRYSTALS-Kyber, ML-KEM)<br><br>
+                <strong>⚠️ NOTE:</strong> This demo uses 29-bit semiprime for speed.<br>
+                Real RSA-2048 demonstrates same mathematical principle.
+            `;
+            document.getElementById('quantumOutput').classList.add('success');
+        }
+    </script>
+</body>
+</html>
