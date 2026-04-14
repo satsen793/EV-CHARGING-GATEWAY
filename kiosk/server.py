@@ -39,7 +39,22 @@ def generate_vfid_and_qr():
         return False
     
     timestamp = int(time.time())
+    
+    # ASCON-128 Encryption
+    print("\n" + "="*70)
+    print("ASCON-128 LIGHTWEIGHT CRYPTOGRAPHY (LWC) - QR GENERATION")
+    print("="*70)
+    print(f"[PLAINTEXT] FID (Original):           {kiosk_fid}")
+    print(f"[KEY]       Encryption Key (16 bytes): {ASCON_KEY.hex()}")
+    print(f"[NONCE]     Timestamp:                 {timestamp}")
+    
     kiosk_vfid_ciphertext, kiosk_vfid_nonce = encrypt_vfid(kiosk_fid, ASCON_KEY, timestamp)
+    
+    print(f"[ENCRYPTED] VFID (Ciphertext):        {base64.b64encode(kiosk_vfid_ciphertext).decode()[:50]}...")
+    print(f"[NONCE]     VFID Nonce (16 bytes):    {base64.b64encode(kiosk_vfid_nonce).decode()}")
+    print("[STATUS]    ✅ ASCON-128 Encryption Complete")
+    print("="*70 + "\n")
+    
     kiosk_vfid_timestamp = json.dumps({"timestamp": timestamp})
     
     qr_payload = {
@@ -71,9 +86,12 @@ def load_fid():
             return jsonify({"error": "Invalid FID format"}), 400
         
         kiosk_fid = fid
+        print(f"\n[KIOSK]     FID Loaded: {fid}")
+        
         if not generate_vfid_and_qr():
             return jsonify({"error": "Failed to generate QR"}), 500
         
+        print("[KIOSK]     QR Code Generated - Ready for Payment\n")
         return jsonify({"message": "FID loaded", "qrReady": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -106,11 +124,29 @@ def payment():
         pin = data.get('pin')
         amount = float(data.get('amount', 0))
         
+        # ASCON-128 Decryption
+        print("\n" + "="*70)
+        print("ASCON-128 LIGHTWEIGHT CRYPTOGRAPHY (LWC) - QR VERIFICATION")
+        print("="*70)
+        print(f"[ENCRYPTED] VFID (Ciphertext):       {base64.b64encode(kiosk_vfid_ciphertext).decode()[:50]}...")
+        print(f"[NONCE]     VFID Nonce (16 bytes):   {base64.b64encode(kiosk_vfid_nonce).decode()}")
+        print(f"[KEY]       Decryption Key (16 bytes): {ASCON_KEY.hex()}")
+        
         try:
             decrypted_fid = decrypt_vfid(kiosk_vfid_ciphertext, kiosk_vfid_nonce, ASCON_KEY)
+            print(f"[DECRYPTED] FID (Original):          {decrypted_fid}")
+            print(f"[VERIFY]    Expected FID:           {kiosk_fid}")
+            
             if decrypted_fid != kiosk_fid:
+                print("[STATUS]    ❌ ASCON-128 Decryption FAILED - FID Mismatch!")
+                print("="*70 + "\n")
                 return jsonify({"approved": False, "message": "VFID validation failed"}), 200
-        except Exception:
+            
+            print("[STATUS]    ✅ ASCON-128 Decryption Successful - FID Verified!")
+        except Exception as e:
+            print(f"[ERROR]     Decryption failed: {str(e)}")
+            print("[STATUS]    ❌ ASCON-128 Decryption FAILED")
+            print("="*70 + "\n")
             return jsonify({"approved": False, "message": "Invalid VFID"}), 200
         
         if not grid_public_key:
@@ -131,6 +167,10 @@ def payment():
                 auth_result = response.json()
                 
                 if auth_result.get('approved'):
+                    print("[PAYMENT]   Amount: $" + str(amount))
+                    print(f"[TXNID]     Transaction ID: {auth_result.get('txnId')}")
+                    print("[STATUS]    ✅ PAYMENT APPROVED - Charging Authorized")
+                    print("="*70 + "\n")
                     return jsonify({
                         "approved": True,
                         "message": "Transaction approved. Charging authorized.",
@@ -138,11 +178,16 @@ def payment():
                         "userBalance": auth_result.get('userBalance')
                     }), 200
                 else:
+                    print(f"[REJECT]    {auth_result.get('message', 'Transaction rejected')}")
+                    print("[STATUS]    ❌ PAYMENT REJECTED")
+                    print("="*70 + "\n")
                     return jsonify({
                         "approved": False,
                         "message": auth_result.get('message', 'Transaction rejected')
                     }), 200
             else:
+                print("[ERROR]     Grid returned error")
+                print("="*70 + "\n")
                 return jsonify({"approved": False, "message": "Grid returned error"}), 200
         except requests.Timeout:
             return jsonify({"approved": False, "message": "Grid server unreachable (timeout)"}), 200
