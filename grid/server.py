@@ -96,7 +96,7 @@ def authorize():
     try:
         data = request.get_json()
         encrypted_creds_b64 = data.get('encryptedCredentials')
-        vfid_b64 = data.get('vfid')
+        fid = data.get('fid')
         vfid_nonce_b64 = data.get('vfidNonce')
         vfid_timestamp = data.get('vfidTimestamp')
         
@@ -140,10 +140,9 @@ def authorize():
         
         registry.deduct_balance(vmid, amount)
         
-        fid_from_payload = vfid_b64
-        registry.credit_balance(fid_from_payload, amount)
+        registry.credit_balance(fid, amount)
         
-        block = blockchain.add_block(user.uid, fid_from_payload, amount, status="SUCCESS")
+        block = blockchain.add_block(user.uid, fid, amount, status="SUCCESS")
         save_blockchain()
         
         return jsonify({

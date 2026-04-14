@@ -120,7 +120,7 @@ def payment():
         
         grid_payload = {
             "encryptedCredentials": base64.b64encode(encrypted_creds).decode(),
-            "vfid": base64.b64encode(kiosk_vfid_ciphertext).decode(),
+            "fid": kiosk_fid,
             "vfidNonce": base64.b64encode(kiosk_vfid_nonce).decode(),
             "vfidTimestamp": json.loads(kiosk_vfid_timestamp)["timestamp"]
         }
