@@ -211,25 +211,33 @@ python verify_system.py
 
 ## 5. Running End-to-End
 
-### Start Services
+### Start Services (REQUIRED - Start Both First!)
 
-**Terminal 1 - Grid Authority**:
+**IMPORTANT: You must start both servers BEFORE making any API calls. Use separate terminal windows and keep them running.**
+
+**Terminal 1 - Grid Authority (Port 5000)**:
 ```bash
 python -m grid.server
 # Output: Running on http://127.0.0.1:5000
+# Keep this terminal open
 ```
 
-**Terminal 2 - Kiosk Server**:
+**Terminal 2 - Kiosk Server (Port 5001)**:
 ```bash
 python -m kiosk.server
 # Output: Running on http://127.0.0.1:5001
+# Keep this terminal open
 ```
+
+**Important**: Both servers must be running and show their respective startup messages before proceeding to the next steps.
 
 ### Execute Complete Flow
 
-**Prerequisites**: Ensure servers are running in separate terminals first!
+**Prerequisites**: Both servers from above must be running in separate terminals!
 
-**Terminal 3 - Register Franchise**:
+Use a **third terminal** or **new PowerShell/Command window** to execute these commands:
+
+**Terminal 3 - Register Franchise** (get FID):
 ```bash
 python -c "
 import requests
